@@ -1,4 +1,4 @@
-/*
+a/*
  * Copyright (C) 2018 Freie Universitat Berlin
  * Copyright (C) 2018 Inria
  *
@@ -13,14 +13,26 @@
 #include "cose/crypto.h"
 #include "cose.h"
 #include "cose_defines.h"
-
+#include "mbed.h"
 #include "cose/test.h"
+
+#define LED_GREEN  led1
+#define LED_RED    led2
+#define LED_BLUE   led3
+
+/* Setup peripherals */
+DigitalOut led1(PA5);
+DigitalOut led2(PB0);
+DigitalOut led3(PA4);
+
 
 static uint8_t buf[2048];
 
 #define CU_ASSERT(A) A
 #define CU_ASSERT_EQUAL(A,B) CU_ASSERT(A)
 #define CU_ASSERT_EQUAL_FATAL(A,B) CU_ASSERT(A)
+
+Serial pc(PC6, PC7);
 
 static const unsigned char cose_suite[] = {
   0xd8, 0x62, 0x84, 0x44, 0xa1, 0x03, 0x18, 0x2a, 0xa0, 0x58, 0xcd, 0x8a,
@@ -59,7 +71,7 @@ static unsigned char pk_x[MBEDTLS_ECP_MAX_BYTES] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x5b, 0x69, 0xb5, 0x30, 0x6d, 0xf5, 0x5c, 0xf8, 0x0a, 0xd0, 0xa9, 0x8c,
     0xa5, 0x76, 0x1c, 0xdc, 0x10, 0x48, 0x3f, 0x29, 0x86, 0xaf, 0xec, 0x56,
-    0x7c, 0xf9, 0xbf, 0xb1, 0xa8, 0x5e, 0x66, 0x92, 
+    0x7c, 0xf9, 0xbf, 0xb1, 0xa8, 0x5e, 0x66, 0x92,
 };
 static unsigned char pk_y[MBEDTLS_ECP_MAX_BYTES] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -80,6 +92,21 @@ static void print_bytestr(const uint8_t *bytes, size_t len)
 
 int main(void)
 {
+    // Turn on all LEDs
+    LED_RED = 1;
+    LED_GREEN = 1;
+    LED_BLUE = 1;
+
+    wait(2);
+
+    // Turn off red and blue; just green is on
+    LED_GREEN = 0;
+    LED_RED = 0;
+    LED_BLUE = 0;
+
+
+    pc.printf("Debug message example\n");
+
     cose_sign_t verify;
     cose_key_t signer;
     cose_signature_t signature;
@@ -91,12 +118,17 @@ int main(void)
     cose_key_init(&signer);
     cose_key_set_keys(&signer, COSE_EC_CURVE_P256, COSE_ALGO_ES256, pk_x, pk_y, NULL);
 
-    printf("COSE bytestream: \n");
+    LED_GREEN = 1;
+    wait(1);
+    pc.printf("COSE bytestream: \n");
     print_bytestr(cose_suite, sizeof(cose_suite));
-    printf("\n");
+    pc.printf("\n");
+
     /* Decode again */
     int decode_success = cose_sign_decode(&verify, cose_suite, sizeof(cose_suite));
-    printf("Decoding: %d\n", decode_success);
+    pc.printf("Decoding: %d\n", decode_success);
+    LED_RED = 1;
+    wait(1);
     /* Verify with signature slot 0 */
     CU_ASSERT_EQUAL_FATAL(decode_success, 0);
 
@@ -105,13 +137,16 @@ int main(void)
     CU_ASSERT(cose_sign_iter(&iter, &signature));
 
     int verification = cose_sign_verify(&verify, &signature, &signer, buf, sizeof(buf));
-    printf("Verification: %d\n", verification);
+    pc.printf("Verification: %d\n", verification);
+    LED_BLUE = 1;
+    wait(1);
     CU_ASSERT_EQUAL(verification, 0);
     cose_hdr_t hdr;
     CU_ASSERT(cose_sign_get_protected(&verify, &hdr, COSE_HDR_CONTENT_TYPE));
     CU_ASSERT_EQUAL(hdr.v.value, 42);
     ssize_t res = cose_signature_get_kid(&signature, &kid);
     CU_ASSERT(res);
-    CU_ASSERT_EQUAL(memcmp(kid, keyid, sizeof(keyid) - 1), 0);
-    printf("Verify Result: %d\n", res);
+    //CU_ASSERT_EQUAL(memcmp(kid, keyid, sizeof(keyid) - 1), 0);
+    pc.printf("Verify Result: %d\n", res);
+
 }
